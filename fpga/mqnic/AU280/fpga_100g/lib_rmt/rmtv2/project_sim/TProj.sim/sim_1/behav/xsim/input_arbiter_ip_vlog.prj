@@ -1,0 +1,13 @@
+# compile verilog/system verilog design source files
+verilog xil_defaultlib  -i "../../../../" --include "../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl" -d "SIMULATION=1" \
+"../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl/small_fifo.v" \
+"../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl/fallthrough_small_fifo.v" \
+"../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl/input_arbiter_cpu_regs.v" \
+"../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl/input_arbiter.v" \
+"../../../../TProj.gen/sources_1/ip/input_arbiter_ip/sim/input_arbiter_ip.v" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort

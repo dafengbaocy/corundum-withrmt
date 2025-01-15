@@ -1,0 +1,39 @@
+# compile verilog/system verilog design source files
+verilog xil_defaultlib  -i "../../../../" --include "../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl" -d "SIMULATION=1" \
+"../../../../TProj.gen/sources_1/ip/parse_act_ram_ip/sim/parse_act_ram_ip.v" \
+"../../../../TProj.gen/sources_1/ip/page_tbl_16w_32d/sim/page_tbl_16w_32d.v" \
+"../../../../TProj.gen/sources_1/ip/blk_mem_gen_0/sim/blk_mem_gen_0.v" \
+"../../../../TProj.gen/sources_1/ip/blk_mem_gen_1/sim/blk_mem_gen_1.v" \
+"../../../../TProj.gen/sources_1/ip/blk_mem_gen_3/sim/blk_mem_gen_3.v" \
+"../../../../TProj.gen/sources_1/ip/blk_mem_gen_2/sim/blk_mem_gen_2.v" \
+"../../../../../action/action_engine.v" \
+"../../../../../action/alu_1.v" \
+"../../../../../action/alu_2.v" \
+"../../../../../action/alu_3.v" \
+"../../../../../action/crossbar.v" \
+"../../../../../depar_do_deparsing.v" \
+"../../../../../depar_wait_segs.v" \
+"../../../../../deparser_top.v" \
+"../../../../../extract/key_extract.v" \
+"../../../../../extract/key_extract_top.v" \
+"../../../../../last_stage.v" \
+"../../../../../lookup/lke_cam_part.v" \
+"../../../../../lookup/lke_ram_part.v" \
+"../../../../../lookup/lookup_engine_top.v" \
+"../../../../../output_arbiter.v" \
+"../../../../../parser_do_parsing.v" \
+"../../../../../parser_do_parsing_top.v" \
+"../../../../../parser_top.v" \
+"../../../../../parser_wait_segs.v" \
+"../../../../../pkt_filter.v" \
+"../../../../../rmt_wrapper.v" \
+"../../../../../stage.v" \
+"../../../../../sub_deparser.v" \
+"../../../../../sub_parser.v" \
+"../../../../../tb/tb_pkt_gen.v" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort

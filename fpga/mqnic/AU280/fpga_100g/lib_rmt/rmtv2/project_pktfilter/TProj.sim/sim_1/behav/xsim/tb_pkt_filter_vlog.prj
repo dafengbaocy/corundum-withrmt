@@ -1,0 +1,9 @@
+# compile verilog/system verilog design source files
+verilog xil_defaultlib  -i "../../../../" --include "../../../../TProj.gen/sources_1/ip/input_arbiter_ip/hdl" -d "SIMULATION=1" \
+"../../../../../tb/tb_pkt_filter.v" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort

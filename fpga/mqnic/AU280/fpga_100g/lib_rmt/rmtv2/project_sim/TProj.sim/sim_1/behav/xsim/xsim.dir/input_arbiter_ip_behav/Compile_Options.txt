@@ -1,0 +1,1 @@
+--incr --debug "typical" --relax --mt "8" -d "SIMULATION=1" -L "xil_defaultlib" -L "unisims_ver" -L "unimacro_ver" -L "secureip" -L "xpm" --snapshot "input_arbiter_ip_behav" "xil_defaultlib.input_arbiter_ip" "xil_defaultlib.glbl" -log "elaborate.log" 

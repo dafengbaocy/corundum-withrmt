@@ -1,0 +1,26 @@
+# compile vhdl design source files
+vhdl cam  \
+"../../../../../../xilinx_cam/cam_init_file_pack_xst.vhd" \
+"../../../../../../xilinx_cam/cam_pkg.vhd" \
+"../../../../../../xilinx_cam/cam_control.vhd" \
+"../../../../../../xilinx_cam/cam_decoder.vhd" \
+"../../../../../../xilinx_cam/cam_input_ternary_ternenc.vhd" \
+"../../../../../../xilinx_cam/cam_input_ternary.vhd" \
+"../../../../../../xilinx_cam/cam_input.vhd" \
+"../../../../../../xilinx_cam/cam_match_enc.vhd" \
+"../../../../../../xilinx_cam/cam_mem_srl16_wrcomp.vhd" \
+"../../../../../../xilinx_cam/cam_mem_srl16_ternwrcomp.vhd" \
+"../../../../../../xilinx_cam/cam_mem_srl16_block_word.vhd" \
+"../../../../../../xilinx_cam/cam_mem_srl16_block.vhd" \
+"../../../../../../xilinx_cam/cam_mem_srl16.vhd" \
+"../../../../../../xilinx_cam/dmem.vhd" \
+"../../../../../../xilinx_cam/cam_mem_blk_extdepth_prim.vhd" \
+"../../../../../../xilinx_cam/cam_mem_blk_extdepth.vhd" \
+"../../../../../../xilinx_cam/cam_mem_blk.vhd" \
+"../../../../../../xilinx_cam/cam_mem.vhd" \
+"../../../../../../xilinx_cam/cam_regouts.vhd" \
+"../../../../../../xilinx_cam/cam_rtl.vhd" \
+"../../../../../../xilinx_cam/cam_top.vhd" \
+
+# Do not sort compile order
+nosort
