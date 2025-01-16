@@ -2,8 +2,8 @@
 
 module tb_user_stage #(
     parameter STAGE = 0,  //valid: 0-4
-    parameter PHV_LEN = 48*8+32*8+16*8+5*20+256,
-    parameter KEY_LEN = 48*2+32*2+16*2+5,
+    parameter PHV_LEN = 48 + 8,
+    parameter KEY_LEN = 48 + 8,
     parameter ACT_LEN = 25,
     parameter KEY_OFF = 3*6
 )();
@@ -13,6 +13,7 @@ reg                      rst_n;
 
 reg [PHV_LEN-1:0]        phv_in;
 reg                      phv_in_valid;
+reg                      stage_ready_in;
 
 wire [PHV_LEN-1:0]       phv_out;
 wire                     phv_out_valid;
@@ -32,6 +33,7 @@ initial begin
     rst_n = 0; //reset all the values
     #(10);
     rst_n = 1;
+    stage_ready_in = 1;
 end
 
 
@@ -44,23 +46,23 @@ initial begin
     /*
         give it a random phv to see what we can get
     */
-    phv_in <= 1124'b0;
+    phv_in = {PHV_LEN{1'b0}};
     phv_in_valid <= 1'b0;
     #CYCLE
-    phv_in <= {48'hffffffffffff, 48'heeeeeeeeeeee, 288'h0, 32'hcccccccc, 32'hbbbbbbbb, 192'b0, 16'hffff, 16'heeee, 96'h0, 356'b0};
+    phv_in <= {48'haaaaaaaaaaaa, 8'd0};
     phv_in_valid <= 1'b1;
-    #CYCLE
-    phv_in <= 1124'b0;
+    #(4*CYCLE)
+    phv_in = {PHV_LEN{1'b0}};
     phv_in_valid <= 1'b0;
     #(4*CYCLE)
 
     /*
         switch the value in container 7 and 6
     */
-    phv_in <= {48'hffffffffffff, 48'heeeeeeeeeeee, 288'h0, 32'hcccccccc, 32'hbbbbbbbb, 192'b0, 16'hffff, 16'heeee, 96'h0, 356'b1};
+    phv_in <= {48'hbbbbbbbbbbbb, 8'd1};
     phv_in_valid <= 1'b1;
-    #CYCLE
-    phv_in <= 1124'b0;
+    #(4*CYCLE)
+    phv_in = {PHV_LEN{1'b0}};
     phv_in_valid <= 1'b0;
     #(4*CYCLE);
 
@@ -69,7 +71,7 @@ end
 
 user_stage #(
     .STAGE(STAGE),
-    .PHV_LEN(),
+    .PHV_LEN(48 + 8),
     .KEY_LEN(),
     .ACT_LEN(),
     .KEY_OFF()    
@@ -79,6 +81,7 @@ user_stage #(
 
     .phv_in(phv_in),
     .phv_in_valid(phv_in_valid),
+    .stage_ready_in(stage_ready_in),
     .phv_out(phv_out),
     .phv_out_valid(phv_out_valid)
 );
