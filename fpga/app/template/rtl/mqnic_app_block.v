@@ -866,30 +866,37 @@ assign s_axis_sync_tx_cpl_ready = m_axis_sync_tx_cpl_ready;
 (* mark_debug = "true", keep = "true" *) wire  m_axis_rmt_sync_rx_tvalid;
 (* mark_debug = "true", keep = "true" *) wire  m_axis_rmt_sync_rx_tlast;
 (* mark_debug = "true", keep = "true" *) wire  m_axis_rmt_sync_rx_tready;
-    rmt_wrapper
-    rmt_wrapper_tx
-    (
-    	.clk(clk),		// axis clk
-    	.aresetn(~rst),	
-        .vlan_drop_flags(32'b0),
-        .ctrl_token(),
+    // rmt_wrapper
+    // rmt_wrapper_tx
+    // (
+    // 	.clk(clk),		// axis clk
+    // 	.aresetn(~rst),	
+    //     .vlan_drop_flags(32'b0),
+    //     .ctrl_token(),
 
-    	// input Slave AXI Stream
-    	.s_axis_tdata(s_axis_sync_rx_tdata),
-    	.s_axis_tkeep(s_axis_sync_rx_tkeep),
-    	.s_axis_tuser(s_axis_sync_rx_tuser),
-    	.s_axis_tvalid(s_axis_sync_rx_tvalid),
-    	.s_axis_tready(s_axis_sync_rx_tready),
-    	.s_axis_tlast(s_axis_sync_rx_tlast),
+    // 	// input Slave AXI Stream
+    // 	.s_axis_tdata(s_axis_sync_rx_tdata),
+    // 	.s_axis_tkeep(s_axis_sync_rx_tkeep),
+    // 	.s_axis_tuser(s_axis_sync_rx_tuser),
+    // 	.s_axis_tvalid(s_axis_sync_rx_tvalid),
+    // 	.s_axis_tready(s_axis_sync_rx_tready),
+    // 	.s_axis_tlast(s_axis_sync_rx_tlast),
 
-    	// output Master AXI Stream
-    	.m_axis_tdata(m_axis_rmt_sync_rx_tdata),
-    	.m_axis_tkeep(m_axis_rmt_sync_rx_tkeep),
-    	.m_axis_tuser(m_axis_rmt_sync_rx_tuser),
-    	.m_axis_tvalid(m_axis_rmt_sync_rx_tvalid),
-    	.m_axis_tready(m_axis_rmt_sync_rx_tready),
-    	.m_axis_tlast(m_axis_rmt_sync_rx_tlast)
-    );
+    // 	// output Master AXI Stream
+    // 	.m_axis_tdata(m_axis_rmt_sync_rx_tdata),
+    // 	.m_axis_tkeep(m_axis_rmt_sync_rx_tkeep),
+    // 	.m_axis_tuser(m_axis_rmt_sync_rx_tuser),
+    // 	.m_axis_tvalid(m_axis_rmt_sync_rx_tvalid),
+    // 	.m_axis_tready(m_axis_rmt_sync_rx_tready),
+    // 	.m_axis_tlast(m_axis_rmt_sync_rx_tlast)
+    // );
+    assign m_axis_rmt_sync_rx_tdata = s_axis_sync_rx_tdata;
+    assign m_axis_rmt_sync_rx_tkeep = s_axis_sync_rx_tkeep;
+    assign m_axis_rmt_sync_rx_tvalid = s_axis_sync_rx_tvalid;
+    assign s_axis_sync_rx_tready = m_axis_rmt_sync_rx_tready;
+    assign m_axis_rmt_sync_rx_tlast = s_axis_sync_rx_tlast;
+    assign m_axis_rmt_sync_rx_tuser = s_axis_sync_rx_tuser;
+    
 // test riscv crossbar
 riscv_parser #(
 	.C_S_AXIS_DATA_WIDTH(512),
@@ -1264,7 +1271,8 @@ Facet facet_inst(
 /* not used as program memory, just an AXI4 test slave */
 /* ID width is clog2(num_masters) num_masters = 2, but we foresee 4 (I,D, PCIe, JTAG->AXI) */
 /*AXIs2axi4 write, soc read */
-axi_ram #(.ID_WIDTH(2)
+axi_ram #(.ID_WIDTH(2),
+        .ADDR_WIDTH(20)
 ) test_ram_inst (
   .clk                 (clk),
   .rst                 (rst),
