@@ -55,9 +55,9 @@ module user_action_engine #(
     wire [7:0]  index;        // Extracted index
 
     // Multi-entry block control signals
-    reg [47:0]  ctrl_mac;     // MAC address to write
-    reg [7:0]   ctrl_index;   // Index to write
-    reg         ctrl_mac_wr;  // Write enable for multi_entry_blk
+    wire [47:0]  ctrl_mac;     // MAC address to write
+    wire [7:0]   ctrl_index;   // Index to write
+    wire         ctrl_mac_wr;  // Write enable for multi_entry_blk
 
     // Multi-entry block outputs
     wire        entry_valid;
@@ -111,22 +111,27 @@ module user_action_engine #(
     // *****************************************************
     // Write Logic to multi_entry_blk
     // *****************************************************
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            ctrl_mac_wr <= 1'b0;
-            ctrl_mac <= 48'b0;
-            ctrl_index <= 8'b0;
-        end else begin
-            if (key_valid_in) begin
-                // Write the MAC address and index to multi_entry_blk
-                ctrl_mac_wr <= 1'b1;
-                ctrl_mac <= mac_address;
-                ctrl_index <= index;
-            end else begin
-                ctrl_mac_wr <= 1'b0; // Disable write when no valid key input
-            end
-        end
-    end
+    // always @(posedge clk or negedge rst_n) begin
+    //     if (!rst_n) begin
+    //         ctrl_mac_wr <= 1'b0;
+    //         ctrl_mac <= 48'b0;
+    //         ctrl_index <= 8'b0;
+    //     end 
+    //     else begin
+    //         if (key_valid_in) begin
+    //             // Write the MAC address and index to multi_entry_blk
+    //             ctrl_mac_wr <= 1'b1;
+    //             ctrl_mac <= mac_address;
+    //             ctrl_index <= index;
+    //         end else begin
+    //             ctrl_mac_wr <= 1'b0; // Disable write when no valid key input
+    //         end
+    //     end
+    // end
+
+    assign ctrl_mac_wr = key_valid_in;
+    assign ctrl_mac = mac_address;
+    assign ctrl_index = index;
 
     // *****************************************************
     // Pass-through Logic for PHV
