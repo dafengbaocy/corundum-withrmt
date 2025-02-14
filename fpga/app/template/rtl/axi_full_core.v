@@ -810,8 +810,8 @@ module axi_full_core#(
 					compare_done <= 1'b0;
 				end
 				// else if (brd_cnt == 0) begin
-				//else if (brd_cnt <= (PIXELS_HORIZONTAL*8)/FDW - 1) begin
-				else if (interrupt_done) begin
+				else if (brd_cnt <= (PIXELS_HORIZONTAL*8)/FDW - 1) begin
+				//else if (interrupt_done) begin
 					mst_exec_state <= INIT_READ;                                                          
 					ERROR <= 1'b0;
 					compare_done <= 1'b0;

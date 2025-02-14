@@ -24,7 +24,7 @@ module fifo2axis#(
     	parameter FDW = 32
     ,	parameter FAW = 8
 
-    ,   parameter FRAME_DELAY = 2 //max 1024
+    ,   parameter FRAME_DELAY = 0 //max 1024
     ,   parameter PIXELS_HORIZONTAL = 1280
     ,   parameter PIXELS_VERTICAL = 1024
 	
@@ -85,17 +85,18 @@ module fifo2axis#(
 wire tx_en;
 reg	[10:0]   	frame_cnt = 0;
 reg	[31:0]		pixel_cnt;
-reg [127:0]		brd_din_buf;
+reg [31:0]		brd_din_buf;
 
 
 
-assign	M_AXIS_TVALID 	=	S_AXIS_TVALID 	;
+
+assign	M_AXIS_TVALID 	=	brd_vld 	;
 assign  M_AXIS_TSTRB	=	S_AXIS_TSTRB	;
 assign 	M_AXIS_TLAST	=	S_AXIS_TLAST	;
 assign	M_AXIS_USER		=	S_AXIS_USER		;	
-assign 	M_AXIS_TDATA 	= (frame_cnt == FRAME_DELAY + 1) ? (brd_din_buf>>(96 - (pixel_cnt[1:0])*32)) : 0;
+assign 	M_AXIS_TDATA 	= (frame_cnt == FRAME_DELAY + 1) ? brd_din : 0;
 
-assign  brd_rdy = ((frame_cnt == FRAME_DELAY + 1) && (tx_en & pixel_cnt[1:0] == 2'b11)) | ((frame_cnt == FRAME_DELAY) & S_AXIS_USER);
+assign  brd_rdy = ((frame_cnt == FRAME_DELAY + 1) && (tx_en)) | ((frame_cnt == FRAME_DELAY) & S_AXIS_USER);
 
 
 //FIFO read enable generation

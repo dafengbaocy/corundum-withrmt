@@ -678,19 +678,7 @@ module mqnic_app_block #
     // // Indicate the start of one frame
     // ,   input wire  S_AXIS_TUSER
 
-    // AXIS maxter port
-	// TREADY indicates that the slave can accept a transfer in the current cycle.
-    ,   input wire  M_AXIS_TREADY
-	// TDATA is the primary payload that is used to provide the data that is passing across the interface from the master.
-    ,   output wire [AXIS_SLAVE_DATA_WIDTH-1 : 0] M_AXIS_TDATA
-	// TSTRB is the byte qualifier that indicates whether the content of the associated byte of TDATA is processed as a data byte or a position byte.
-    ,   output wire [(AXIS_SLAVE_DATA_WIDTH/8)-1 : 0] M_AXIS_TSTRB
-	// TLAST indicates the boundary of a packet.
-    ,   output wire  M_AXIS_TLAST
-	// Master Stream Ports. TVALID indicates that the master is driving a valid transfer, A transfer takes place when both TVALID and TREADY are asserted.
-    ,   output wire  M_AXIS_TVALID
-    // Indicate the start of one frame
-    ,   output wire  M_AXIS_TUSER
+
 
 );
 
@@ -866,6 +854,27 @@ assign s_axis_sync_tx_cpl_ready = m_axis_sync_tx_cpl_ready;
 (* mark_debug = "true", keep = "true" *) wire  m_axis_rmt_sync_rx_tvalid;
 (* mark_debug = "true", keep = "true" *) wire  m_axis_rmt_sync_rx_tlast;
 (* mark_debug = "true", keep = "true" *) wire  m_axis_rmt_sync_rx_tready;
+  // wire for merge
+    (* mark_debug = "true", keep = "true" *) wire [511:0] m_axis_merge_sync_rx_tdata;
+    (* mark_debug = "true", keep = "true" *) wire [63:0] m_axis_merge_sync_rx_tkeep;
+    (* mark_debug = "true", keep = "true" *) wire [127:0] m_axis_merge_sync_rx_tuser;
+    (* mark_debug = "true", keep = "true" *) wire  m_axis_merge_sync_rx_tvalid;
+    (* mark_debug = "true", keep = "true" *) wire  m_axis_merge_sync_rx_tlast;
+    (* mark_debug = "true", keep = "true" *) wire  m_axis_merge_sync_rx_tready;
+
+        // AXIS maxter port
+	// TREADY indicates that the slave can accept a transfer in the current cycle.
+     wire  M_AXIS_TREADY;
+	// TDATA is the primary payload that is used to provide the data that is passing across the interface from the master.
+     wire [AXIS_SLAVE_DATA_WIDTH-1 : 0] M_AXIS_TDATA;
+	// TSTRB is the byte qualifier that indicates whether the content of the associated byte of TDATA is processed as a data byte or a position byte.
+     wire [(AXIS_SLAVE_DATA_WIDTH/8)-1 : 0] M_AXIS_TSTRB;
+	// TLAST indicates the boundary of a packet.
+     wire  M_AXIS_TLAST;
+	// Master Stream Ports. TVALID indicates that the master is driving a valid transfer, A transfer takes place when both TVALID and TREADY are asserted.
+     wire  M_AXIS_TVALID;
+    // Indicate the start of one frame
+     wire  M_AXIS_TUSER;
     // rmt_wrapper
     // rmt_wrapper_tx
     // (
@@ -896,6 +905,9 @@ assign s_axis_sync_tx_cpl_ready = m_axis_sync_tx_cpl_ready;
     assign s_axis_sync_rx_tready = m_axis_rmt_sync_rx_tready;
     assign m_axis_rmt_sync_rx_tlast = s_axis_sync_rx_tlast;
     assign m_axis_rmt_sync_rx_tuser = s_axis_sync_rx_tuser;
+
+  
+
     
 // test riscv crossbar
 riscv_parser #(
@@ -917,13 +929,13 @@ riscv_parser #(
 
 
 	// output Master AXI Stream
-	.m_axis_tdata(m_axis_sync_rx_tdata),
-	.m_axis_tkeep(m_axis_sync_rx_tkeep),
-	.m_axis_tuser(m_axis_sync_rx_tuser),
-	.m_axis_tvalid(m_axis_sync_rx_tvalid),
+	.m_axis_tdata(m_axis_merge_sync_rx_tdata),
+	.m_axis_tkeep(m_axis_merge_sync_rx_tkeep),
+	.m_axis_tuser(m_axis_merge_sync_rx_tuser),
+	.m_axis_tvalid(m_axis_merge_sync_rx_tvalid),
 	// .m_axis_tready(s_axis_tready_f && s_axis_tready_p),
-	.m_axis_tready(m_axis_sync_rx_tready),
-	.m_axis_tlast(m_axis_sync_rx_tlast),
+	.m_axis_tready(m_axis_merge_sync_rx_tready),
+	.m_axis_tlast(m_axis_merge_sync_rx_tlast),
 
 	//control path
 	.c_m_axis_tdata(m_axis_riscv_sync_rx_tdata),
@@ -1395,7 +1407,7 @@ axis2ddr_top #(.C_M_AXI_ID_WIDTH(2)) axis2axi4_inst(
     .M_AXIS_ARESETN     (~rst),
 
 	// TREADY indicates that the slave can accept a transfer in the current cycle.
-    .M_AXIS_TREADY      (1'b1),
+    .M_AXIS_TREADY      (M_AXIS_TREADY),
 	// TDATA is the primary payload that is used to provide the data that is passing across the interface from the master.
     .M_AXIS_TDATA       (M_AXIS_TDATA),
 	// TSTRB is the byte qualifier that indicates whether the content of the associated byte of TDATA is processed as a data byte or a position byte.
@@ -1532,6 +1544,31 @@ axis2ddr_top #(.C_M_AXI_ID_WIDTH(2)) axis2axi4_inst(
     // Read ready. This signal indicates that the master can
     // accept the read data and response information.
     .M_AXI_RREADY       (ram1_rready)
+);
+
+mergeAXIS #(.ID_ENABLE(1)) mergeAXIS_inst(
+    .clk(clk),
+    .rst(rst),
+    .s0_axis_tdata(m_axis_merge_sync_rx_tdata),
+    .s0_axis_tkeep(m_axis_merge_sync_rx_tkeep),
+    .s0_axis_tvalid(m_axis_merge_sync_rx_tvalid),
+    .s0_axis_tlast(m_axis_merge_sync_rx_tlast),
+    .s0_axis_tuser(m_axis_merge_sync_rx_tuser),
+    .s0_axis_tready(m_axis_merge_sync_rx_tready),
+    
+    .s1_axis_tdata(M_AXIS_TDATA),
+    .s1_axis_tkeep(M_AXIS_TSTRB),
+    .s1_axis_tvalid(M_AXIS_TVALID),
+    .s1_axis_tlast(M_AXIS_TLAST),
+    .s1_axis_tuser(M_AXIS_TUSER),
+    .s1_axis_tready(M_AXIS_TREADY),
+
+    .m_axis_tdata(m_axis_sync_rx_tdata),
+    .m_axis_tkeep(m_axis_sync_rx_tkeep),
+    .m_axis_tvalid(m_axis_sync_rx_tvalid),
+    .m_axis_tlast(m_axis_sync_rx_tlast),
+    .m_axis_tuser(m_axis_sync_rx_tuser),
+    .m_axis_tready(m_axis_sync_rx_tready)
 );
 
 

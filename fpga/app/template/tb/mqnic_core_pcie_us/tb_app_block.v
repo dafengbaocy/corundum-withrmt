@@ -39,8 +39,8 @@ module tb_app_block;
         .s_axis_sync_rx_tvalid  (M_AXIS_TVALID),
         .s_axis_sync_rx_tuser    (M_AXIS_TUSER),
 
-        .m_axis_sync_rx_tready(m_axis_tready),
-        .M_AXIS_TREADY      (M_riscv_AXIS_TREADY)
+        .m_axis_sync_rx_tready(m_axis_tready)
+        
     );
 
 
@@ -111,25 +111,25 @@ end
     M_AXIS_TVALID <= 1'b1;
     M_AXIS_TLAST <= 1'b1;
         #(CYCLE)
-    M_AXIS_TDATA <= 512'h01010101000000000400000002000000090090821a00a2a1d2040101a8c00201a8c06af71140000001002e000045000801000081050403020100090000000000; 
-    M_AXIS_TSTRB <= 64'hffffffffffffffff;
-    M_AXIS_TUSER <= 97'h00000cedc4ec21f3850220000;
-    M_AXIS_TVALID <= 1'b1;
-    M_AXIS_TLAST <= 1'b1;
-    // #CYCLE;
-    // M_AXIS_TDATA <= {65'hffffffffffffffff,64'hffffffff81000002,16'h0002,143'b0, 8'h11, 24'hffff, 16'ha1a2, 32'b0, 16'h0008, 128'hfffffffffffeeee}; 
+    // M_AXIS_TDATA <= 512'h01010101000000000400000002000000090090821a00a2a1d2040101a8c00201a8c06af71140000001002e000045000801000081050403020100090000000000; 
     // M_AXIS_TSTRB <= 64'hffffffffffffffff;
-    // M_AXIS_TUSER <= 128'h1;
+    // M_AXIS_TUSER <= 97'h00000cedc4ec21f3850220000;
     // M_AXIS_TVALID <= 1'b1;
     // M_AXIS_TLAST <= 1'b1;
-        #(CYCLE)
+    // // #CYCLE;
+    // // M_AXIS_TDATA <= {65'hffffffffffffffff,64'hffffffff81000002,16'h0002,143'b0, 8'h11, 24'hffff, 16'ha1a2, 32'b0, 16'h0008, 128'hfffffffffffeeee}; 
+    // // M_AXIS_TSTRB <= 64'hffffffffffffffff;
+    // // M_AXIS_TUSER <= 128'h1;
+    // // M_AXIS_TVALID <= 1'b1;
+    // // M_AXIS_TLAST <= 1'b1;
+    //     #(CYCLE)
     M_AXIS_TDATA <= 512'h02020202000000000400000002000000090090821a00a2a1d2040101a8c00201a8c06af71140000001002e000045000801000081050403020100090000000000; 
     M_AXIS_TSTRB <= 64'hffffffffffffffff;
     M_AXIS_TUSER <= 128'h0;
     M_AXIS_TVALID <= 1'b1;
     M_AXIS_TLAST <= 1'b1;
     #CYCLE;
-        #(CYCLE)
+    #(CYCLE)
     M_AXIS_TDATA <= 512'h06060303000000000400000002000000090090821a00a2a1d2040101a8c00201a8c06af71140000001002e000045000801000081050403020100090000000000; 
     M_AXIS_TSTRB <= 64'hffffffffffffffff;
     M_AXIS_TUSER <= 128'h0;

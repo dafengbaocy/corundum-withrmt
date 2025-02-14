@@ -271,6 +271,28 @@ module axis2ddr_top#(
      wire  s_AXIS_TUSER;
 
 
+
+    //add axis fifo for trans
+    // AXIS maxter port
+    // AXI4Stream sink: Clock
+     wire  m_AXIS_ACLK;
+    // AXI4Stream sink: Reset
+    wire  m_AXIS_ARESETN;
+
+	// TREADY indicates that the slave can accept a transfer in the current cycle.
+     wire  m_AXIS_TREADY;
+	// TDATA is the primary payload that is used to provide the data that is passing across the interface from the master.
+     wire [AXIS_DATA_WIDTH-1 : 0] m_AXIS_TDATA;
+	//s the byte qualifier that indicates whether the content of the associated byte of TDATA is processed as a data byte or a position byte.
+     wire [(AXIS_DATA_WIDTH/8)-1 : 0] m_AXIS_TSTRB;
+	//ndicates the boundary of a packet.
+     wire  m_AXIS_TLAST;
+	//Stream Ports. TVALID indicates that the master is driving a valid transfer, A transfer takes place when both TVALID and TREADY are asserted.
+     wire  m_AXIS_TVALID;
+    //e the start of one frame
+     wire  m_AXIS_TUSER;
+
+
 axis_fifo_adapter #(
     .S_DATA_WIDTH(AXIS_DATA_WIDTH)
 ,   .M_DATA_WIDTH(AXI4_DATA_WIDTH)
@@ -292,6 +314,28 @@ axis_fifo_adapter #(
     ,   .m_axis_tlast       (s_AXIS_TLAST       )
     ,   .m_axis_tvalid      (s_AXIS_TVALID      )
     ,   .m_axis_tuser        (s_AXIS_TUSER       )
+);
+axis_fifo_adapter #(
+    .S_DATA_WIDTH(AXI4_DATA_WIDTH)
+,   .M_DATA_WIDTH(AXIS_DATA_WIDTH)
+) u_axis_async_fifo_adapter_brd(
+           .clk        (M_AXIS_ACLK        )
+    ,   .rst     (~M_AXIS_ARESETN     )
+    ,   .s_axis_tready      (m_AXIS_TREADY      )
+    ,   .s_axis_tdata       (m_AXIS_TDATA       )
+    ,   .s_axis_tkeep       (m_AXIS_TSTRB       )
+    ,   .s_axis_tlast       (m_AXIS_TLAST       )
+    ,   .s_axis_tvalid      (m_AXIS_TVALID      )
+    ,   .s_axis_tuser        (m_AXIS_TUSER       )
+
+    //,    .m_clk        (s_AXIS_ACLK        )
+//,   .m_rst     (s_AXIS_ARESETN     )
+    ,   .m_axis_tready      (M_AXIS_TREADY      )
+    ,   .m_axis_tdata       (M_AXIS_TDATA       )
+    ,   .m_axis_tkeep       (M_AXIS_TSTRB       )
+    ,   .m_axis_tlast       (M_AXIS_TLAST       )
+    ,   .m_axis_tvalid      (M_AXIS_TVALID      )
+    ,   .m_axis_tuser        (M_AXIS_TUSER       )
 );
 
 
@@ -338,25 +382,25 @@ axis2fifo #(
 //---------------------------------------------------
 // BACKWARD FIFO TO AXI STREAM 
 fifo2axis #(
-        .FRAME_DELAY        (frame_delay        )
+        .FRAME_DELAY        (0      )
     ,   .PIXELS_HORIZONTAL  (pixels_horizontal  )
     ,   .PIXELS_VERTICAL    (pixels_vertical    )
 
     ,   .FDW                (AXI4_DATA_WIDTH    )
     ,   .FAW                (FIFO_AW            )
-    ,   .AXIS_DATA_WIDTH	(AXIS_DATA_WIDTH    )
+    ,   .AXIS_DATA_WIDTH	(AXI4_DATA_WIDTH    )
     ,   .AXI4_DATA_WIDTH    (AXI4_DATA_WIDTH    )
 )u_fifo2axis_maxter(
 //----------------------------------------------------
 // AXIS maxter port
-	    .M_AXIS_ACLK        (M_AXIS_ACLK        )
-	,   .M_AXIS_ARESETN     (M_AXIS_ARESETN     )
-	,   .M_AXIS_TVALID      (M_AXIS_TVALID      )
-	,   .M_AXIS_TDATA       (M_AXIS_TDATA       )
-	,   .M_AXIS_TSTRB       (M_AXIS_TSTRB       )
-	,   .M_AXIS_TLAST       (M_AXIS_TLAST       )
-	,   .M_AXIS_TREADY      (M_AXIS_TREADY      )
-    ,   .M_AXIS_USER        (M_AXIS_TUSER       )
+	    .M_AXIS_ACLK        (m_AXIS_ACLK        )
+	,   .M_AXIS_ARESETN     (m_AXIS_ARESETN     )
+	,   .M_AXIS_TVALID      (m_AXIS_TVALID      )
+	,   .M_AXIS_TDATA       (m_AXIS_TDATA       )
+	,   .M_AXIS_TSTRB       (m_AXIS_TSTRB       )
+	,   .M_AXIS_TLAST       (m_AXIS_TLAST       )
+	,   .M_AXIS_TREADY      (m_AXIS_TREADY      )
+    ,   .M_AXIS_USER        (m_AXIS_TUSER       )
 
 //----------------------------------------------------
 // AXIS slave port
@@ -366,7 +410,7 @@ fifo2axis #(
     ,   .S_AXIS_TDATA       (S_AXIS_TDATA       )
     ,   .S_AXIS_TSTRB       (S_AXIS_TSTRB       )
     ,   .S_AXIS_TLAST       (S_AXIS_TLAST       )
-    ,   .S_AXIS_TVALID      (S_AXIS_TVALID      )
+    ,   .S_AXIS_TVALID      (s_AXIS_TVALID      )
     ,   .S_AXIS_USER        (S_AXIS_TUSER       )
 
 //----------------------------------------------------
