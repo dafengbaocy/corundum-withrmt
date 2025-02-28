@@ -64,48 +64,6 @@ always @(posedge i_clk or negedge i_rst_n) begin
 end
 
 //***************************************************
-//                源地址查找逻辑
-//***************************************************
-always @(posedge i_clk or negedge i_rst_n) begin
-    if (!i_rst_n) begin
-        o_s_hit <= 1'b0;
-        ov_s_index <= 8'b0;
-    end else begin
-        o_s_hit <= 1'b0;
-        ov_s_index <= 8'b0;
-        if (i_smac_valid) begin
-            for (i = 0; i < ENTRY_NUM; i = i + 1) begin
-                if (o_entry_valid_array[i] && (ov_entry_array[i] == iv_smac)) begin
-                    o_s_hit <= 1'b1;
-                    ov_s_index <= ov_index_array[i];
-                end
-            end
-        end
-    end
-end
-
-//***************************************************
-//                目的地址查找逻辑
-//***************************************************
-always @(posedge i_clk or negedge i_rst_n) begin
-    if (!i_rst_n) begin
-        o_d_hit <= 1'b0;
-        ov_d_index <= 8'b0;
-    end else begin
-        o_d_hit <= 1'b0;
-        ov_d_index <= 8'b0;
-        if (i_dmac_valid) begin
-            for (i = 0; i < ENTRY_NUM; i = i + 1) begin
-                if (o_entry_valid_array[i] && (ov_entry_array[i] == iv_dmac)) begin
-                    o_d_hit <= 1'b1;
-                    ov_d_index <= ov_index_array[i];
-                end
-            end
-        end
-    end
-end
-
-//***************************************************
 //                表项老化逻辑
 //***************************************************
 always @(posedge i_clk or negedge i_rst_n) begin
