@@ -7,6 +7,7 @@ module atp_entry_blk #(
 
     // 写接口
     input               i_valid,       // 输入数据有效信号
+    input               timestamp_update,
     input               is_dellocated,  //是否要被重置
     output reg          i_ready,       // 模块准备好接收输入信号
     input [15:0]        i_index,       // 输入索引
@@ -74,7 +75,7 @@ always @(posedge i_clk or negedge i_rst_n) begin
             //ecn_array[i_index-1] <= i_ecn;
             jobAndSequenceId_array[i_index-1] <= 32'b0;
             timestamp_array[i_index-1] <= 32'b0;
-            value_array[i_index-1] <= i_value;
+            value_array[i_index-1] <= {AGGREGATOR_WIDTH{1'b0}};
         end
         if (i_index > 0 && i_index <= ENTRY_NUM) begin
             // 根据索引写入对应的表项
@@ -83,6 +84,9 @@ always @(posedge i_clk or negedge i_rst_n) begin
             //ecn_array[i_index-1] <= i_ecn;
             jobAndSequenceId_array[i_index-1] <= i_jobAndSequenceId;
             value_array[i_index-1] <= i_value;
+            if (timestamp_update == 1'b1) begin
+                timestamp_array[i_index-1] = 32'b0;
+            end
         end
         i_ready <= 1'b0; // 写操作完成后暂时不可接收新输入
     end else begin
