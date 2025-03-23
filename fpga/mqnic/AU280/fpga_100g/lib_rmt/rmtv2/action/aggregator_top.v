@@ -5,7 +5,10 @@ module aggregator_top #(
     parameter ACTION_LEN = 25,
     parameter STAGE_ID = 0,
     parameter PHV_LEN = 512,          // PHV长度，匹配seq_kv_extractor.v
-    parameter KV_IDX = 0              // 默认使用第0个KV对
+    parameter KV_IDX = 0,              // 默认使用第0个KV对
+    parameter PHV_ADDR_WIDTH = 4,
+    parameter KEY_OFF = 1*32,   // 密钥偏移位置
+    parameter VALUE_OFF = 4*32  // 值偏移位置
 )(
     input                           clk,
     input                           rst_n,
@@ -14,8 +17,8 @@ module aggregator_top #(
     input [PHV_LEN-1:0]            phv_in,
     
     // 从seq_kv_extractor接收的KV对输入
-    input [3:0][KEY_WIDTH-1:0]     keys_in,      // 4个key输入
-    input [3:0][VALUE_WIDTH-1:0]   values_in,    // 4个value输入
+    input [4*KEY_WIDTH-1:0]     keys_in,      // 4个key输入
+    input [4*VALUE_WIDTH-1:0]   values_in,    // 4个value输入
     
     // 从seq_kv_extractor接收的序列号相关输入
     input [19:0]                   base_addr_in,      // 基地址
@@ -42,43 +45,58 @@ module aggregator_top #(
     // State Unit 与 Aggregator 之间的连接
     wire                          su_valid_in;
     wire [1:0]                    su_exec_state;
-    wire [3:0]                    su_new_bitmap;
-    wire [31:0]                   su_new_ptype;
     wire                          su_valid_out;
-    wire [13:0]                   su_hash_addr;
+    wire [1:0]                    su_hash_addr;      // 哈希地址 - 改为2位宽
+    
+    // 接收执行单元当前状态
+    wire [2:0]                    sm_state;
+    
+    // 定义状态机状态常量 - 与执行单元保持一致
+    localparam SM_IDLE = 3'd0;
+    localparam SM_MEM_READ = 3'd1;
+    localparam SM_EXEC_STATE_UNIT = 3'd2;
+    localparam SM_MEM_WRITE = 3'd3;
+    localparam SM_INCREMENT = 3'd4;
+    localparam SM_LOAD_ALL_KEYS = 3'd5;   // 读取所有key
+    localparam SM_LOAD_ALL_VALUES = 3'd6; // 读取所有value
+    localparam SM_COMPLETE = 3'd7;
     
     // 内存读取结果接口
     wire [KEY_WIDTH-1:0]          mem_read_key;
     wire                          mem_read_valid;
     
-    // ALU2接口信号
+    // ALU2接口信号 - 改回32位宽度
     wire [24:0]                   alu_action;
     wire                          alu_action_valid;
-    wire [KEY_WIDTH-1:0]          alu_operand_1;
-    wire [31:0]                   alu_operand_2;
-    wire [VALUE_WIDTH-1:0]        alu_operand_3;
-    wire [KEY_WIDTH-1:0]          alu_result;
+    wire [KEY_WIDTH-1:0]          alu_operand_1;     // 改回32位
+    wire [31:0]                   alu_operand_2;     // 地址保持32位
+    wire [KEY_WIDTH-1:0]          alu_operand_3;     // 改回32位
+    wire [KEY_WIDTH-1:0]          alu_result;        // 改回32位
     wire                          alu_result_valid;
     wire                          alu_ready;
     
-    // 为4个ALU实例添加信号
-    wire [3:0][KEY_WIDTH-1:0]     alu_results;
+    // 为4个ALU实例添加信号 - 改回32位宽度
+    wire [4*KEY_WIDTH-1:0]        alu_results;      // 改回32位
     wire [3:0]                    alu_result_valids;
     wire [3:0]                    alu_readys;
     
     // 添加哈希结果信号
     wire [1:0]                    hash_result;
     
-    // CLEANUP状态需要的额外信号
-    wire [3:0][KEY_WIDTH-1:0]     cleanup_data;       // 存储从各个ALU读取的数据，改为wire类型
-    
     // 选择使用的key和value (使用指定索引的KV对)
     wire [KEY_WIDTH-1:0]          key_selected;
     wire [VALUE_WIDTH-1:0]        value_selected;
     
+    // 处理内存地址的偏移常量
+    localparam ADDR_SHIFT = 0;    // 将ADDR_SHIFT保持为0
+    
+    // 存储CLEANUP时读取的key和value的寄存器
+    reg [4*KEY_WIDTH-1:0]        cleanup_keys;
+    reg [4*VALUE_WIDTH-1:0]      cleanup_values;
+    
     // 直接获取指定索引的KV对
-    assign key_selected = keys_in[KV_IDX];
-    assign value_selected = values_in[KV_IDX];
+    assign key_selected = keys_in[(KV_IDX+1)*KEY_WIDTH-1:KV_IDX*KEY_WIDTH];
+    assign value_selected = values_in[(KV_IDX+1)*VALUE_WIDTH-1:KV_IDX*VALUE_WIDTH];
     
     // 状态与控制寄存器
     reg [3:0] bitmap_reg;
@@ -152,17 +170,13 @@ module aggregator_top #(
     // 简单的哈希函数：使用key的低2位作为哈希结果
     assign hash_result = key_selected[1:0];
     
-    // 直接将ALU结果映射到清理数据
-    assign cleanup_data[0] = alu_results[0];
-    assign cleanup_data[1] = alu_results[1];
-    assign cleanup_data[2] = alu_results[2];
-    assign cleanup_data[3] = alu_results[3];
-    
     // 位图和有效信号寄存器逻辑
     always @(posedge clk or negedge rst_n) begin
         if (~rst_n) begin
             bitmap_reg <= 4'b0;
             valid_reg <= 1'b0;
+            cleanup_keys <= {(4*KEY_WIDTH){1'b0}};
+            cleanup_values <= {(4*VALUE_WIDTH){1'b0}};
         end
         else if (valid_in && ready_out) begin
             // 初始化位图寄存器为输入位图 - 只取有效的4位
@@ -178,6 +192,17 @@ module aggregator_top #(
         else begin
             valid_reg <= 1'b0;
         end
+        
+        // 保存CLEANUP时读取的key和value - 使用执行状态判断
+        if (alu_result_valid) begin
+            if (sm_state == SM_LOAD_ALL_KEYS) begin
+                // 保存读取的key
+                cleanup_keys <= alu_results;
+            end else if (sm_state == SM_LOAD_ALL_VALUES) begin
+                // 保存读取的value
+                cleanup_values <= alu_results;
+            end
+        end
     end
     
     // 直接使用assign语句构建phv_out
@@ -189,7 +214,7 @@ module aggregator_top #(
     wire [PHV_LEN-1:0] phv_out_cleanup;
     
     // 使用条件运算符构建CLEANUP状态下的PHV输出
-    // 1. 更新PTYPE字段
+    // 1. 更新PTYPE字段为回写类型
     assign phv_out_cleanup[PTYPE_POS_END:PTYPE_POS_START] = PTYPE_BACK;
     
     // 2. 保持其他字段不变
@@ -197,41 +222,31 @@ module aggregator_top #(
     assign phv_out_cleanup[PHV_LEN-1:PTYPE_POS_END+1] = phv_in[PHV_LEN-1:PTYPE_POS_END+1];
     
     // 3. 根据hash_result值在索引5-8的位置写入ALU结果
-    // 修改phv_out_cleanup相应部分的赋值
-    assign phv_out_cleanup[IDX5_KEY_END+:32] = (alu_result_valid && hash_result == 2'b00) ? 
-                                              alu_results[0] : phv_in[IDX5_KEY_END+:32];
-    assign phv_out_cleanup[IDX5_VALUE_END+:32] = (alu_result_valid && hash_result == 2'b00) ? 
-                                               32'b0 : phv_in[IDX5_VALUE_END+:32];
-                                               
-    assign phv_out_cleanup[IDX6_KEY_END+:32] = (alu_result_valid && hash_result == 2'b01) ? 
-                                              alu_results[1] : phv_in[IDX6_KEY_END+:32];
-    assign phv_out_cleanup[IDX6_VALUE_END+:32] = (alu_result_valid && hash_result == 2'b01) ? 
-                                               32'b0 : phv_in[IDX6_VALUE_END+:32];
-                                               
-    assign phv_out_cleanup[IDX7_KEY_END+:32] = (alu_result_valid && hash_result == 2'b10) ? 
-                                              alu_results[2] : phv_in[IDX7_KEY_END+:32];
-    assign phv_out_cleanup[IDX7_VALUE_END+:32] = (alu_result_valid && hash_result == 2'b10) ? 
-                                               32'b0 : phv_in[IDX7_VALUE_END+:32];
-                                               
-    assign phv_out_cleanup[IDX8_KEY_END+:32] = (alu_result_valid && hash_result == 2'b11) ? 
-                                              alu_results[3] : phv_in[IDX8_KEY_END+:32];
-    assign phv_out_cleanup[IDX8_VALUE_END+:32] = (alu_result_valid && hash_result == 2'b11) ? 
-                                               32'b0 : phv_in[IDX8_VALUE_END+:32];
+    // 使用保存的key和value
+    assign phv_out_cleanup[IDX5_KEY_END+:32] = cleanup_keys[0+:KEY_WIDTH];            // 地址0的key
+    assign phv_out_cleanup[IDX5_VALUE_END+:32] = cleanup_values[0+:VALUE_WIDTH];      // 地址0的value
+                                             
+    assign phv_out_cleanup[IDX6_KEY_END+:32] = cleanup_keys[KEY_WIDTH+:KEY_WIDTH];    // 地址1的key
+    assign phv_out_cleanup[IDX6_VALUE_END+:32] = cleanup_values[VALUE_WIDTH+:VALUE_WIDTH]; // 地址1的value
+                                             
+    assign phv_out_cleanup[IDX7_KEY_END+:32] = cleanup_keys[2*KEY_WIDTH+:KEY_WIDTH];   // 地址2的key
+    assign phv_out_cleanup[IDX7_VALUE_END+:32] = cleanup_values[2*VALUE_WIDTH+:VALUE_WIDTH]; // 地址2的value
+                                             
+    assign phv_out_cleanup[IDX8_KEY_END+:32] = cleanup_keys[3*KEY_WIDTH+:KEY_WIDTH];   // 地址3的key
+    assign phv_out_cleanup[IDX8_VALUE_END+:32] = cleanup_values[3*VALUE_WIDTH+:VALUE_WIDTH]; // 地址3的value
     
     // 为UPDATE状态创建修改后的PHV输出
     wire [PHV_LEN-1:0] phv_out_update;
     
-    // 在UPDATE状态下更新位图和ptype
+    // 在UPDATE状态下只更新位图
     assign phv_out_update = {
-        phv_in[PHV_LEN-1:PTYPE_POS_END+1],                  // 保持PHV高位部分不变
-        su_new_ptype[7:0],                                  // 更新ptype字段
-        phv_in[PTYPE_POS_START-1:BITMAP_POS_END+1],         // 保持中间部分不变
-        bitmap_reg,                                         // 更新位图的高4位
-        phv_in[BITMAP_POS_END-4:0]                          // 保持PHV低位部分不变
+        phv_in[PHV_LEN-1:BITMAP_POS_END+1],                  // 保持PHV高位部分不变
+        bitmap_reg,                                          // 更新位图字段
+        phv_in[BITMAP_POS_START-1:0]                         // 保持PHV低位部分不变
     };
     
-    // 最终phv_out的选择逻辑
-    assign phv_out = (valid_reg && alu_result_valid && su_exec_state == CLEANUP) ? phv_out_cleanup :
+    // 最终phv_out的选择逻辑 - 基于执行状态和当前读取阶段
+    assign phv_out = (valid_reg && alu_result_valid && sm_state == SM_LOAD_ALL_VALUES) ? phv_out_cleanup :
                     (valid_reg && alu_result_valid && su_exec_state == UPDATE) ? phv_out_update :
                     phv_out_base;
     
@@ -260,8 +275,6 @@ module aggregator_top #(
         
         // 输出接口 - 决策结果
         .exec_state(su_exec_state),
-        .new_bitmap(su_new_bitmap),
-        .new_ptype(su_new_ptype),
         .valid_out(su_valid_out)
     );
     
@@ -269,7 +282,8 @@ module aggregator_top #(
     aggregator #(
         .KEY_WIDTH(KEY_WIDTH),
         .VALUE_WIDTH(VALUE_WIDTH),
-        .MEMORY_DEPTH(MEMORY_DEPTH)
+        .MEMORY_DEPTH(MEMORY_DEPTH),
+        .KV_IDX(KV_IDX)  // 传递KV对索引参数
     ) exec_unit (
         .clk(clk),
         .rst_n(rst_n),
@@ -284,8 +298,6 @@ module aggregator_top #(
         // State Unit 接口
         .su_valid_in(su_valid_in),
         .su_exec_state(su_exec_state),
-        .su_new_bitmap(su_new_bitmap),
-        .su_new_ptype(su_new_ptype),
         .su_valid_out(su_valid_out),
         .su_hash_addr(su_hash_addr),
         
@@ -304,13 +316,16 @@ module aggregator_top #(
         .alu_ready(alu_ready),
         
         // 页表接口 - 简化处理，固定值
-        .page_tbl_out(16'h0100),  // 默认值，无多租户
+        .page_tbl_out(16'h0400),  // 默认值，无多租户
         .page_tbl_req(),          // 不关联
         
         // 输出接口 - 这里我们需要连接wire给模块，但最终输出只使用phv_out
         .out_bitmap(),  // 不需要连接到输出端口
         .out_ptype(),   // 不需要连接到输出端口
-        .valid_out(valid_out)
+        .valid_out(valid_out),
+        
+        // 连接状态机状态输出
+        .sm_state_out(sm_state)
     );
     
     // 实例化内存交互单元
@@ -321,19 +336,23 @@ module aggregator_top #(
             alu_2 #(
                 .STAGE_ID(STAGE_ID),
                 .ACTION_LEN(ACTION_LEN),
-                .DATA_WIDTH(KEY_WIDTH)
+                .DATA_WIDTH(KEY_WIDTH)  // 改回32位宽度
             ) memory_unit (
                 .clk(clk),
                 .rst_n(rst_n),
                 
-                // 输入接口 - 在UPDATE时使用hash结果选择ALU
-                // 在CLEANUP时，所有ALU都需要激活来读取各自内存
+                // 输入接口 - 使用状态机状态判断何时激活所有ALU
+                // 在SM_LOAD_ALL_KEYS或SM_LOAD_ALL_VALUES状态下激活所有ALU
+                // 在其他状态下只根据哈希结果激活指定ALU
                 .action_in(alu_action),
                 .action_valid(alu_action_valid && 
-                             ((su_exec_state == CLEANUP) || 
-                              (su_exec_state != CLEANUP && hash_result == i))),
+                             ((sm_state == SM_LOAD_ALL_KEYS || sm_state == SM_LOAD_ALL_VALUES) || 
+                              (sm_state != SM_LOAD_ALL_KEYS && sm_state != SM_LOAD_ALL_VALUES && hash_result == i))),
                 .operand_1_in(alu_operand_1),
-                .operand_2_in(alu_operand_2),
+                // 修改地址计算逻辑：在读取所有键值对时，每个ALU使用自己的索引i作为基地址
+                .operand_2_in((sm_state == SM_LOAD_ALL_KEYS || sm_state == SM_LOAD_ALL_VALUES) ? 
+                             {{(30-ADDR_SHIFT){1'b0}}, i[1:0], {ADDR_SHIFT{1'b0}}} + alu_operand_2 : 
+                             alu_operand_2),
                 .operand_3_in(alu_operand_3),
                 .ready_out(alu_readys[i]),
                 
@@ -342,7 +361,7 @@ module aggregator_top #(
                 .page_tbl_out_valid(1'b1),  // 始终有效
                 
                 // 输出接口
-                .container_out_w(alu_results[i]),
+                .container_out_w(alu_results[i*KEY_WIDTH+:KEY_WIDTH]),
                 .container_out_valid(alu_result_valids[i]),
                 .ready_in(ready_in)
             );
@@ -350,13 +369,11 @@ module aggregator_top #(
     endgenerate
     
     // 根据执行状态和哈希结果选择ALU输出
-    // 在UPDATE状态使用哈希结果选择ALU
-    // 在CLEANUP状态，需要接收所有ALU的输出
-    assign alu_result = alu_results[hash_result];
-    assign alu_result_valid = (su_exec_state == CLEANUP) ? 
-                             |alu_result_valids : 
-                             alu_result_valids[hash_result];
-    assign alu_ready = (su_exec_state == CLEANUP) ? 
+    assign alu_result = alu_results[hash_result*KEY_WIDTH+:KEY_WIDTH];
+    assign alu_result_valid = (sm_state == SM_LOAD_ALL_KEYS || sm_state == SM_LOAD_ALL_VALUES) ? 
+                             &alu_result_valids : // 在批量读取状态下需要所有ALU完成
+                             alu_result_valids[hash_result]; // 在其他状态下只需指定ALU完成
+    assign alu_ready = (sm_state == SM_LOAD_ALL_KEYS || sm_state == SM_LOAD_ALL_VALUES) ? 
                       &alu_readys : 
                       alu_readys[hash_result];
     
