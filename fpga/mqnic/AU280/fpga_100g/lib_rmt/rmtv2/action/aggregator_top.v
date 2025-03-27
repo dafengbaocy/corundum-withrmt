@@ -83,23 +83,21 @@ module aggregator_top #(
     // 添加哈希结果信号
     wire [1:0]                    hash_result;
     
-    // 选择使用的key和value (使用指定索引的KV对)
-    wire [KEY_WIDTH-1:0]          key_selected;
-    wire [VALUE_WIDTH-1:0]        value_selected;
-    
     // 处理内存地址的偏移常量
     localparam ADDR_SHIFT = 0;    // 将ADDR_SHIFT保持为0
     
-    // 存储CLEANUP时读取的key和value的寄存器
+    // 仅保留cleanup_keys寄存器用于保存LOAD_ALL_KEYS阶段的结果
     reg [4*KEY_WIDTH-1:0]        cleanup_keys;
-    reg [4*VALUE_WIDTH-1:0]      cleanup_values;
+    
+    // 选择使用的key和value (使用指定索引的KV对)
+    wire [KEY_WIDTH-1:0]          key_selected;
+    wire [VALUE_WIDTH-1:0]        value_selected;
     
     // 直接获取指定索引的KV对
     assign key_selected = keys_in[(KV_IDX+1)*KEY_WIDTH-1:KV_IDX*KEY_WIDTH];
     assign value_selected = values_in[(KV_IDX+1)*VALUE_WIDTH-1:KV_IDX*VALUE_WIDTH];
     
     // 状态与控制寄存器
-    reg [3:0] bitmap_reg;
     reg valid_reg;
     
     // 执行状态定义 - 与aggregator和aggregator_state_unit保持一致
@@ -118,14 +116,14 @@ module aggregator_top #(
     // myh.seq位置: 404 + 32(ib) = 436到467
     // myh.ptype位置: 436 + 32(seq) = 468到475
     
-    localparam BITMAP_POS_START = 404;    // 位图(ib)在PHV中的起始位置
-    localparam BITMAP_POS_END = 435;      // 位图(ib)在PHV中的结束位置
-    localparam FID_POS_START = 372;       // FID在PHV中的起始位置
-    localparam FID_POS_END = 387;         // FID在PHV中的结束位置
-    localparam SEQ_POS_START = 436;       // SEQ在PHV中的起始位置
-    localparam SEQ_POS_END = 467;         // SEQ在PHV中的结束位置
-    localparam PTYPE_POS_START = 468;     // PTYPE在PHV中的起始位置
-    localparam PTYPE_POS_END = 475;       // PTYPE在PHV中的结束位置
+localparam BITMAP_POS_START = 0;      // 位图(ib)在PHV中的起始位置
+localparam BITMAP_POS_END = 31;        // 位图(ib)在PHV中的结束位置
+localparam FID_POS_START = 32;         // FID在PHV中的起始位置
+localparam FID_POS_END = 63;           // FID在PHV中的结束位置
+localparam SEQ_POS_START = 64;         // SEQ在PHV中的起始位置
+localparam SEQ_POS_END = 95;           // SEQ在PHV中的结束位置
+localparam PTYPE_POS_START = 96;       // PTYPE在PHV中的起始位置
+localparam PTYPE_POS_END = 103;        // PTYPE在PHV中的结束位置
     
     // 额外定义KV对在PHV中的位置 - 更新为32位宽度
     // 由于KEY和VALUE现在是32位，每对KV需要64位，PHV的512位可以存放8个KV对
@@ -173,35 +171,19 @@ module aggregator_top #(
     // 位图和有效信号寄存器逻辑
     always @(posedge clk or negedge rst_n) begin
         if (~rst_n) begin
-            bitmap_reg <= 4'b0;
             valid_reg <= 1'b0;
             cleanup_keys <= {(4*KEY_WIDTH){1'b0}};
-            cleanup_values <= {(4*VALUE_WIDTH){1'b0}};
         end
         else if (valid_in && ready_out) begin
-            // 初始化位图寄存器为输入位图 - 只取有效的4位
-            bitmap_reg <= valid_bitmap_in;
             valid_reg <= valid_in;
-            
-            // 处理UPDATE状态下的位图更新
-            if (alu_result_valid && su_exec_state == UPDATE) begin
-                // 更新操作：清除指定KV对的位图位
-                bitmap_reg[KV_IDX] <= 1'b0;  // 清除对应位图位
-            end
         end
         else begin
             valid_reg <= 1'b0;
         end
         
-        // 保存CLEANUP时读取的key和value - 使用执行状态判断
-        if (alu_result_valid) begin
-            if (sm_state == SM_LOAD_ALL_KEYS) begin
-                // 保存读取的key
-                cleanup_keys <= alu_results;
-            end else if (sm_state == SM_LOAD_ALL_VALUES) begin
-                // 保存读取的value
-                cleanup_values <= alu_results;
-            end
+        // 仅在LOAD_ALL_KEYS阶段保存keys
+        if (alu_result_valid && sm_state == SM_LOAD_ALL_KEYS) begin
+            cleanup_keys <= alu_results;
         end
     end
     
@@ -213,42 +195,71 @@ module aggregator_top #(
     // 为CLEANUP状态创建修改后的PHV输出
     wire [PHV_LEN-1:0] phv_out_cleanup;
     
-    // 使用条件运算符构建CLEANUP状态下的PHV输出
-    // 1. 更新PTYPE字段为回写类型
-    assign phv_out_cleanup[PTYPE_POS_END:PTYPE_POS_START] = PTYPE_BACK;
+    // 使用单个连续赋值构建CLEANUP状态下的PHV输出，使用正确的位选择方向
+assign phv_out_cleanup = {
+    // PHV的高位部分保持不变
+    phv_in[PHV_LEN-1:IDX8_KEY_END+1],  // 确保使用高位到低位选择
     
-    // 2. 保持其他字段不变
-    assign phv_out_cleanup[PTYPE_POS_START-1:0] = phv_in[PTYPE_POS_START-1:0];
-    assign phv_out_cleanup[PHV_LEN-1:PTYPE_POS_END+1] = phv_in[PHV_LEN-1:PTYPE_POS_END+1];
+    // 地址3的key和value (IDX8)
+    cleanup_keys[(3+1)*KEY_WIDTH-1:(3*KEY_WIDTH)],  // 使用保存的keys
+    alu_results[(3+1)*VALUE_WIDTH-1:(3*VALUE_WIDTH)],  // 直接使用当前alu结果作为values
     
-    // 3. 根据hash_result值在索引5-8的位置写入ALU结果
-    // 使用保存的key和value
-    assign phv_out_cleanup[IDX5_KEY_END+:32] = cleanup_keys[0+:KEY_WIDTH];            // 地址0的key
-    assign phv_out_cleanup[IDX5_VALUE_END+:32] = cleanup_values[0+:VALUE_WIDTH];      // 地址0的value
-                                             
-    assign phv_out_cleanup[IDX6_KEY_END+:32] = cleanup_keys[KEY_WIDTH+:KEY_WIDTH];    // 地址1的key
-    assign phv_out_cleanup[IDX6_VALUE_END+:32] = cleanup_values[VALUE_WIDTH+:VALUE_WIDTH]; // 地址1的value
-                                             
-    assign phv_out_cleanup[IDX7_KEY_END+:32] = cleanup_keys[2*KEY_WIDTH+:KEY_WIDTH];   // 地址2的key
-    assign phv_out_cleanup[IDX7_VALUE_END+:32] = cleanup_values[2*VALUE_WIDTH+:VALUE_WIDTH]; // 地址2的value
-                                             
-    assign phv_out_cleanup[IDX8_KEY_END+:32] = cleanup_keys[3*KEY_WIDTH+:KEY_WIDTH];   // 地址3的key
-    assign phv_out_cleanup[IDX8_VALUE_END+:32] = cleanup_values[3*VALUE_WIDTH+:VALUE_WIDTH]; // 地址3的value
+    // 地址2的key和value (IDX7)
+    cleanup_keys[(2+1)*KEY_WIDTH-1:(2*KEY_WIDTH)],
+    alu_results[(2+1)*VALUE_WIDTH-1:(2*VALUE_WIDTH)],
+    
+    // 地址1的key和value (IDX6)
+    cleanup_keys[(1+1)*KEY_WIDTH-1:(1*KEY_WIDTH)],
+    alu_results[(1+1)*VALUE_WIDTH-1:(1*VALUE_WIDTH)],
+    
+    // 地址0的key和value (IDX5)
+    cleanup_keys[KEY_WIDTH-1:0],
+    alu_results[VALUE_WIDTH-1:0],
+    
+    // 中间部分保持不变
+    phv_in[IDX5_VALUE_END-1:PTYPE_POS_END+1],
+    
+    // 修改PTYPE字段为回写类型
+    PTYPE_BACK,
+    
+    // PHV的低位部分保持不变
+    phv_in[PTYPE_POS_START-1:0]
+};
     
     // 为UPDATE状态创建修改后的PHV输出
     wire [PHV_LEN-1:0] phv_out_update;
     
+    // 创建修改后的位图 - 在UPDATE状态下清除对应位
+    wire [3:0] updated_bitmap;
+    assign updated_bitmap = valid_bitmap_in & ~(1'b1 << KV_IDX);  // 清除KV_IDX对应的位
+    
     // 在UPDATE状态下只更新位图
     assign phv_out_update = {
-        phv_in[PHV_LEN-1:BITMAP_POS_END+1],                  // 保持PHV高位部分不变
-        bitmap_reg,                                          // 更新位图字段
-        phv_in[BITMAP_POS_START-1:0]                         // 保持PHV低位部分不变
+        phv_in[PHV_LEN-1:BITMAP_POS_END+1],          // 保持PHV高位部分不变
+        updated_bitmap                              // 直接使用修改后的位图，无需寄存器
     };
     
-    // 最终phv_out的选择逻辑 - 基于执行状态和当前读取阶段
-    assign phv_out = (valid_reg && alu_result_valid && sm_state == SM_LOAD_ALL_VALUES) ? phv_out_cleanup :
-                    (valid_reg && alu_result_valid && su_exec_state == UPDATE) ? phv_out_update :
-                    phv_out_base;
+    // 存储准备好的PHV输出
+    reg [PHV_LEN-1:0] phv_out_reg;
+    reg processing_done;  // 添加寄存器标识处理完成状态
+    
+    // 在LOAD_ALL_VALUES或INCREMENT状态时保存PHV输出
+    always @(posedge clk or negedge rst_n) begin
+        if (~rst_n) begin
+            phv_out_reg <= {PHV_LEN{1'b0}};
+            processing_done <= 1'b0;
+        end
+        else if (alu_result_valid && (sm_state == SM_LOAD_ALL_VALUES || sm_state == SM_INCREMENT)) begin
+            phv_out_reg <= (sm_state == SM_LOAD_ALL_VALUES) ? phv_out_cleanup : phv_out_update;
+            processing_done <= 1'b1;
+        end
+        else if (sm_state == SM_COMPLETE) begin
+            processing_done <= 1'b0;
+        end
+    end
+    
+    // 最终phv_out的选择逻辑 - 根据处理完成状态选择输出
+    assign phv_out = (processing_done && sm_state == SM_COMPLETE) ? phv_out_reg : phv_out_base;
     
     // 实例化状态决策单元
     aggregator_state_unit #(
