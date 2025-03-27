@@ -33,7 +33,7 @@ module aggregator_top #(
     
     // 有效信号和控制
     input                          valid_in,
-    input                          ready_in,
+    input                          ready_in,          // 新增ready_in接口
     
     // 输出接口 - 仅保留PHV输出
     output [PHV_LEN-1:0]           phv_out,           // PHV输出，包含所有处理结果
@@ -374,7 +374,7 @@ assign phv_out_cleanup = {
                 // 输出接口
                 .container_out_w(alu_results[i*KEY_WIDTH+:KEY_WIDTH]),
                 .container_out_valid(alu_result_valids[i]),
-                .ready_in(ready_in)
+                .ready_in(ready_in)  // 连接到新增的ready_in接口
             );
         end
     endgenerate
