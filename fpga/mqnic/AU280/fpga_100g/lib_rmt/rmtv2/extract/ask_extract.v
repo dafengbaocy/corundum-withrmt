@@ -24,7 +24,6 @@ module ask_extract #(
     
     // 提取的关键字段输出
     output [31:0]                       bitmap_out,         // 位图
-    output [15:0]                       aggre_index_out,    // 聚合索引
     output [7:0]                        ptype_out,          // 包类型
     
     input                               ready_in
@@ -39,14 +38,11 @@ localparam SEQ_POS_START = 64;        // SEQ在PHV中的起始位置
 localparam SEQ_POS_END = 95;          // SEQ在PHV中的结束位置
 localparam PTYPE_POS_START = 96;      // PTYPE在PHV中的起始位置
 localparam PTYPE_POS_END = 103;       // PTYPE在PHV中的结束位置
-localparam AGGRE_INDEX_POS_START = 47; // 聚合索引起始位置，来自atp_extractor
-localparam AGGRE_INDEX_POS_END = 32;   // 聚合索引结束位置
 
 // 内部寄存器
 reg [PHV_LEN-1:0]         phv_reg;
 reg                       valid_reg;
 reg [31:0]                bitmap_reg;
-reg [15:0]                aggre_index_reg;
 reg [7:0]                 ptype_reg;
 
 // 输出赋值
@@ -56,7 +52,6 @@ assign ready_out = ready_in;
 
 // 直接输出提取的字段
 assign bitmap_out = bitmap_reg;
-assign aggre_index_out = aggre_index_reg;
 assign ptype_out = ptype_reg;
 
 // 字段提取逻辑
@@ -65,7 +60,6 @@ always @(posedge clk or negedge rst_n) begin
         phv_reg <= 0;
         valid_reg <= 0;
         bitmap_reg <= 0;
-        aggre_index_reg <= 0;
         ptype_reg <= 0;
     end
     else if (phv_valid_in && valid_in && ready_in) begin
@@ -75,7 +69,6 @@ always @(posedge clk or negedge rst_n) begin
         
         // 从PHV中提取关键字段
         bitmap_reg <= phv_in[BITMAP_POS_END:BITMAP_POS_START];
-        aggre_index_reg <= phv_in[AGGRE_INDEX_POS_END:AGGRE_INDEX_POS_START];
         ptype_reg <= phv_in[PTYPE_POS_END:PTYPE_POS_START];
     end
     else begin

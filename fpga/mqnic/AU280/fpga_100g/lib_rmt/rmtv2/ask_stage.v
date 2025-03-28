@@ -52,7 +52,6 @@ module ask_stage #(
 wire [PHV_LEN-1:0]           ask2agg_phv;
 wire                         ask2agg_phv_valid;
 wire [31:0]                  ask2agg_bitmap;
-wire [15:0]                  ask2agg_aggre_index;
 wire [7:0]                   ask2agg_ptype;
 wire                         agg2ask_ready;
 
@@ -71,7 +70,6 @@ wire                         is_aggr_pkt_to_agg;  // 是否为聚合包
 reg [PHV_LEN-1:0]            ask2agg_phv_r;
 reg                          ask2agg_phv_valid_r;
 reg [31:0]                   ask2agg_bitmap_r;
-reg [15:0]                   ask2agg_aggre_index_r;
 reg [7:0]                    ask2agg_ptype_r;
 
 // VLAN 信号传递
@@ -91,7 +89,6 @@ always @(posedge axis_clk) begin
         ask2agg_phv_r <= 0;
         ask2agg_phv_valid_r <= 0;
         ask2agg_bitmap_r <= 0;
-        ask2agg_aggre_index_r <= 0;
         ask2agg_ptype_r <= 0;
         
         vlan_out_r <= 0;
@@ -107,7 +104,6 @@ always @(posedge axis_clk) begin
         ask2agg_phv_r <= ask2agg_phv;
         ask2agg_phv_valid_r <= ask2agg_phv_valid;
         ask2agg_bitmap_r <= ask2agg_bitmap;
-        ask2agg_aggre_index_r <= ask2agg_aggre_index;
         ask2agg_ptype_r <= ask2agg_ptype;
         
         vlan_out_r <= vlan_in;  // 传递VLAN信号
@@ -147,7 +143,6 @@ ask_extract #(
     
     // 提取的关键字段输出
     .bitmap_out(ask2agg_bitmap),
-    .aggre_index_out(ask2agg_aggre_index),
     .ptype_out(ask2agg_ptype),
     
     .ready_in(agg2ask_ready)
@@ -161,10 +156,12 @@ assign vlan_ready_out = agg2ask_ready;
 // 实际实现中可能需要根据具体的PHV格式进行调整
 assign keys_to_agg = ask2agg_phv_r[255:128];    // 假设4个32位key在PHV的这个位置
 assign values_to_agg = ask2agg_phv_r[127:0];    // 假设4个32位value在PHV的这个位置
-assign base_addr_to_agg = ask2agg_aggre_index_r[15:0] << 4; // 从aggre_index生成基地址
+// 由于移除了聚合索引，使用bitmap的低20位作为基址
+assign base_addr_to_agg = {ask2agg_bitmap_r[19:0]};
 assign valid_bitmap_to_agg = 4'b1111;           // 默认所有KV对都有效，可根据实际需求调整
 assign is_even_seq_to_agg = 1'b1;               // 默认为偶数序列
-assign index_to_agg = ask2agg_aggre_index_r[13:0]; // 寄存器索引
+// 使用bitmap的低14位作为寄存器索引
+assign index_to_agg = ask2agg_bitmap_r[13:0];
 assign is_empty_to_agg = 1'b0;                  // 默认不为空
 assign is_update_to_agg = 1'b1;                 // 默认为更新操作
 assign is_aggr_pkt_to_agg = (ask2agg_ptype_r == 8'h09); // 如果ptype为0x09，则为聚合包
