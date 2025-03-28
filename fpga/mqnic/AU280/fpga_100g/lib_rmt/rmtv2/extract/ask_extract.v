@@ -3,7 +3,7 @@ module ask_extract #(
     parameter C_S_AXIS_DATA_WIDTH = 512,
     parameter C_S_AXIS_TUSER_WIDTH = 128,
     parameter STAGE_ID = 0,
-    parameter PHV_LEN = 512,          // 匹配aggregator_top
+    parameter PHV_LEN = 1024,          // 扩展为1024位，匹配新的PHV格式
     parameter KEY_WIDTH = 32,         // 关键字宽度
     parameter VALUE_WIDTH = 32        // 值宽度
 )(

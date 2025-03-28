@@ -4,7 +4,7 @@ module aggregator_top #(
     parameter MEMORY_DEPTH = 16384,  // 2^14
     parameter ACTION_LEN = 25,
     parameter STAGE_ID = 0,
-    parameter PHV_LEN = 512,          // PHV长度，匹配seq_kv_extractor.v
+    parameter PHV_LEN = 1024,         // 扩展为1024位
     parameter KV_IDX = 0,              // 默认使用第0个KV对
     parameter PHV_ADDR_WIDTH = 4,
     parameter KEY_OFF = 1*32,   // 密钥偏移位置
@@ -196,35 +196,35 @@ localparam PTYPE_POS_END = 103;        // PTYPE在PHV中的结束位置
     wire [PHV_LEN-1:0] phv_out_cleanup;
     
     // 使用单个连续赋值构建CLEANUP状态下的PHV输出，使用正确的位选择方向
-assign phv_out_cleanup = {
-    // PHV的高位部分保持不变
-    phv_in[PHV_LEN-1:IDX8_KEY_END+1],  // 确保使用高位到低位选择
-    
-    // 地址3的key和value (IDX8)
-    cleanup_keys[(3+1)*KEY_WIDTH-1:(3*KEY_WIDTH)],  // 使用保存的keys
-    alu_results[(3+1)*VALUE_WIDTH-1:(3*VALUE_WIDTH)],  // 直接使用当前alu结果作为values
-    
-    // 地址2的key和value (IDX7)
-    cleanup_keys[(2+1)*KEY_WIDTH-1:(2*KEY_WIDTH)],
-    alu_results[(2+1)*VALUE_WIDTH-1:(2*VALUE_WIDTH)],
-    
-    // 地址1的key和value (IDX6)
-    cleanup_keys[(1+1)*KEY_WIDTH-1:(1*KEY_WIDTH)],
-    alu_results[(1+1)*VALUE_WIDTH-1:(1*VALUE_WIDTH)],
-    
-    // 地址0的key和value (IDX5)
-    cleanup_keys[KEY_WIDTH-1:0],
-    alu_results[VALUE_WIDTH-1:0],
-    
-    // 中间部分保持不变
-    phv_in[IDX5_VALUE_END-1:PTYPE_POS_END+1],
-    
-    // 修改PTYPE字段为回写类型
-    PTYPE_BACK,
-    
-    // PHV的低位部分保持不变
-    phv_in[PTYPE_POS_START-1:0]
-};
+    assign phv_out_cleanup = {
+        // 位768-1023 - 从内存读取的KV对
+        // 地址3的key和value (位 960-1023)
+        cleanup_keys[(3+1)*KEY_WIDTH-1:(3*KEY_WIDTH)],  // 使用保存的keys
+        alu_results[(3+1)*VALUE_WIDTH-1:(3*VALUE_WIDTH)],  // 直接使用当前alu结果作为values
+        
+        // 地址2的key和value (位 896-959)
+        cleanup_keys[(2+1)*KEY_WIDTH-1:(2*KEY_WIDTH)],
+        alu_results[(2+1)*VALUE_WIDTH-1:(2*VALUE_WIDTH)],
+        
+        // 地址1的key和value (位 832-895)
+        cleanup_keys[(1+1)*KEY_WIDTH-1:(1*KEY_WIDTH)],
+        alu_results[(1+1)*VALUE_WIDTH-1:(1*VALUE_WIDTH)],
+        
+        // 地址0的key和value (位 768-831)
+        cleanup_keys[KEY_WIDTH-1:0],
+        alu_results[VALUE_WIDTH-1:0],
+        
+        // 原始KV对部分保持不变 (位 512-767)
+        phv_in[767:512],
+        
+        // 保持原始PHV的256-511位不变
+        phv_in[511:256],
+        
+        // 低位部分 (位 0-255) - 修改PTYPE字段为回写类型
+        phv_in[255:PTYPE_POS_END+1],
+        PTYPE_BACK,
+        phv_in[PTYPE_POS_START-1:0]
+    };
     
     // 为UPDATE状态创建修改后的PHV输出
     wire [PHV_LEN-1:0] phv_out_update;

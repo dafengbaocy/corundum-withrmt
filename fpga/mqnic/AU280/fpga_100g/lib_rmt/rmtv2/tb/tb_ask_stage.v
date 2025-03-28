@@ -2,7 +2,7 @@
 
 module tb_ask_stage #(
     parameter STAGE = 0,  //valid: 0-4
-    parameter PHV_LEN = 512,
+    parameter PHV_LEN = 1024, // 扩展为1024位
     parameter KEY_WIDTH = 32,
     parameter VALUE_WIDTH = 32,
     parameter MEMORY_DEPTH = 16384,
@@ -81,16 +81,37 @@ initial begin
     
     #(5*CYCLE);
     
-    // 测试用例1：发送一个包含KV对的PHV
+    // 测试用例1：发送一个标准聚合包（bitmap全为1，ptype=0x09）
     phv_in <= {
-        // 4个KV对 (每个KV对64位)
-        {32'hdeadbeef, 32'h12345678},  // KV对0
-        {32'hcafebabe, 32'h87654321},  // KV对1
-        {32'hfeedface, 32'h11223344},  // KV对2
-        {32'hdeadc0de, 32'h44332211},  // KV对3
-        // 其他PHV字段
-        {PHV_LEN-256{1'b0}}
+        // 位768-1023 - 从内存读出的KV对部分（初始为0）
+        {256'b0},
+        
+        // 位512-767 - PHV携带的初始KV对
+        32'hbeadbeef, 32'h12345678,  // KV对0 (位 704-767)
+        32'hcafebabe, 32'h87654321,  // KV对1 (位 640-703)
+        32'hfeedface, 32'h11223344,  // KV对2 (位 576-639)
+        32'hbeadc0de, 32'h44332211,  // KV对3 (位 512-575)
+        
+        // 位256-511 - 保留空间，可用于其他数据
+        {256'b0},
+        
+        // 位0-255 - 基础元数据字段
+        // 剩余的PHV低位部分 (位 104-255)
+        {152'b0},
+        
+        // PTYPE字段 (位 96-103)
+        8'h09,                       // PTYPE=0x09 (聚合包类型)
+        
+        // SEQ字段 (位 64-95)
+        32'hAABBCCDD,                // SEQ字段
+        
+        // FID字段 (位 32-63)
+        32'h12345678,                // FID字段
+        
+        // BITMAP字段 (位 0-31)
+        32'hFFFFFFFF                 // BITMAP字段 (全部置为1)
     };
+    
     phv_in_valid <= 1;
     vlan_in <= 12'h123;
     vlan_valid_in <= 1;
@@ -103,23 +124,44 @@ initial begin
     vlan_in <= 0;
     vlan_valid_in <= 0;
     
-    #(4*CYCLE);
+    #(15*CYCLE);
     
-    // 测试用例2：发送一个更新操作的PHV
+    // 测试用例2：发送一个非聚合包（bitmap全为1，ptype=0x00）
     phv_in <= {
-        // 4个KV对，其中包含一个需要更新的值
-        {32'hdeadbeef, 32'h12345678},  // KV对0
-        {32'hcafebabe, 32'h87654321},  // KV对1
-        {32'hfeedface, 32'h11223344},  // KV对2
-        {32'hdeadc0de, 32'h44332211},  // KV对3
-        // 其他PHV字段
-        {PHV_LEN-256{1'b0}}
+        // 位768-1023 - 从内存读出的KV对部分（初始为0）
+        {256'b0},
+        
+        // 位512-767 - PHV携带的初始KV对
+        32'hceadbeef, 32'h12345678,  // KV对0 (位 704-767)
+        32'hcafebabe, 32'h87654321,  // KV对1 (位 640-703)
+        32'hfeedface, 32'h11223344,  // KV对2 (位 576-639)
+        32'hceadc0de, 32'h44332211,  // KV对3 (位 512-575)
+        
+        // 位256-511 - 保留空间，可用于其他数据
+        {256'b0},
+        
+        // 位0-255 - 基础元数据字段
+        // 剩余的PHV低位部分 (位 104-255)
+        {152'b0},
+        
+        // PTYPE字段 (位 96-103)
+        8'h00,                       // PTYPE=0x00 (非聚合包)
+        
+        // SEQ字段 (位 64-95)
+        32'h11223344,                // SEQ字段
+        
+        // FID字段 (位 32-63)
+        32'h87654321,                // FID字段
+        
+        // BITMAP字段 (位 0-31)
+        32'hFFFFFFFF                 // BITMAP字段 (全部置为1)
     };
+    
     phv_in_valid <= 1;
     vlan_in <= 12'h456;
     vlan_valid_in <= 1;
     
-    #CYCLE;
+    #(2*CYCLE);
     
     // 重置输入信号
     phv_in <= 0;
@@ -127,23 +169,44 @@ initial begin
     vlan_in <= 0;
     vlan_valid_in <= 0;
     
-    #(4*CYCLE);
+    #(15*CYCLE);
     
-    // 测试用例3：发送一个清理操作的PHV
+    // 测试用例3：发送一个更新操作包（bitmap全为1，ptype=0x0A - 假设这是更新操作类型）
     phv_in <= {
-        // 4个KV对，用于清理操作
-        {32'hdeadbeef, 32'h12345678},  // KV对0
-        {32'hcafebabe, 32'h87654321},  // KV对1
-        {32'hfeedface, 32'h11223344},  // KV对2
-        {32'hdeadc0de, 32'h44332211},  // KV对3
-        // 其他PHV字段
-        {PHV_LEN-256{1'b0}}
+        // 位768-1023 - 从内存读出的KV对部分（初始为0）
+        {256'b0},
+        
+        // 位512-767 - PHV携带的初始KV对
+        32'hdeadbeef, 32'h12345678,  // KV对0 (位 704-767)
+        32'hcafebabe, 32'h87654321,  // KV对1 (位 640-703)
+        32'hfeedface, 32'h11223344,  // KV对2 (位 576-639)
+        32'hdeadc0de, 32'h44332211,  // KV对3 (位 512-575)
+        
+        // 位256-511 - 保留空间，可用于其他数据
+        {256'b0},
+        
+        // 位0-255 - 基础元数据字段
+        // 剩余的PHV低位部分 (位 104-255)
+        {152'b0},
+        
+        // PTYPE字段 (位 96-103)
+        8'h0A,                       // PTYPE=0x0A (假设为更新操作类型)
+        
+        // SEQ字段 (位 64-95)
+        32'h55667788,                // SEQ字段
+        
+        // FID字段 (位 32-63)
+        32'hABCDEF01,                // FID字段
+        
+        // BITMAP字段 (位 0-31)
+        32'hFFFFFFFF                 // BITMAP字段 (全部置为1)
     };
+    
     phv_in_valid <= 1;
     vlan_in <= 12'h789;
     vlan_valid_in <= 1;
     
-    #CYCLE;
+    #(2*CYCLE);
     
     // 重置输入信号
     phv_in <= 0;
@@ -151,7 +214,7 @@ initial begin
     vlan_in <= 0;
     vlan_valid_in <= 0;
     
-    #(4*CYCLE);
+    #(15*CYCLE);
 end
 
 // 实例化ask_stage模块

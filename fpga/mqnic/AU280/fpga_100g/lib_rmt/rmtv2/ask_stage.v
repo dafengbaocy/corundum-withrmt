@@ -4,7 +4,7 @@ module ask_stage #(
     parameter C_S_AXIS_DATA_WIDTH = 512,
     parameter C_S_AXIS_TUSER_WIDTH = 128,
     parameter STAGE_ID = 0,
-    parameter PHV_LEN = 512,
+    parameter PHV_LEN = 1024,          // 扩展为1024位
     parameter KEY_WIDTH = 32,         // 关键字宽度
     parameter VALUE_WIDTH = 32,       // 值宽度
     parameter MEMORY_DEPTH = 16384,   // 2^14
@@ -152,10 +152,21 @@ ask_extract #(
 assign vlan_ready_out = agg2ask_ready;
 
 // 从PHV中提取的数据填充到聚合器所需要的输入
-// 这里假设PHV中已经有了KV对和元数据
-// 实际实现中可能需要根据具体的PHV格式进行调整
-assign keys_to_agg = ask2agg_phv_r[255:128];    // 假设4个32位key在PHV的这个位置
-assign values_to_agg = ask2agg_phv_r[127:0];    // 假设4个32位value在PHV的这个位置
+// KV对现在在PHV的512-767位置
+// 按照每个key-value对的方式提取，而不是先提取所有key再提取所有value
+assign keys_to_agg = {
+    ask2agg_phv_r[767:736],  // KV对3的key (位 767-736)
+    ask2agg_phv_r[703:672],  // KV对2的key (位 703-672)
+    ask2agg_phv_r[639:608],  // KV对1的key (位 639-608)
+    ask2agg_phv_r[575:544]   // KV对0的key (位 575-544)
+};
+assign values_to_agg = {
+    ask2agg_phv_r[735:704],  // KV对3的value (位 735-704)
+    ask2agg_phv_r[671:640],  // KV对2的value (位 671-640)
+    ask2agg_phv_r[607:576],  // KV对1的value (位 607-576)
+    ask2agg_phv_r[543:512]   // KV对0的value (位 543-512)
+};
+
 // 由于移除了聚合索引，使用bitmap的低20位作为基址
 assign base_addr_to_agg = {ask2agg_bitmap_r[19:0]};
 assign valid_bitmap_to_agg = 4'b1111;           // 默认所有KV对都有效，可根据实际需求调整

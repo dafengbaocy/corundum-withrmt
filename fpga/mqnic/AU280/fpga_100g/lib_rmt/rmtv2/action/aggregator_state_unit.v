@@ -2,7 +2,7 @@ module aggregator_state_unit #(
     parameter KEY_WIDTH = 32,
     parameter VALUE_WIDTH = 32,
     parameter MEMORY_DEPTH = 16384,  // 2^14
-    parameter CLEANUP_THRESHOLD = 5  // 新增参数：清理阈值，达到此值后触发CLEANUP
+    parameter CLEANUP_THRESHOLD = 1024  // 新增参数：清理阈值，达到此值后触发CLEANUP
 )(
     input                           clk,
     input                           rst_n,
